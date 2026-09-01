@@ -1,0 +1,15 @@
+# ============================================================================
+# dsh-locale-zh-tw —— DSH bundle patch
+# ============================================================================
+# 這是套件的「掛載聲明」。DSH 啟動時按 bundle 層棧疊加各套件的 patch，
+# 本檔把 dsh-locale-zh-tw 插入 Web profile 的設定樹，讓 loader 啟用這個
+# 項目，瀏覽端的 client-modules 才會組合本套件的瀏覽端 bundle。
+#
+# 安裝方式：
+#   dsh plugin --profile web add dsh-locale-zh-tw
+#   或把套件加入 profile 的 dsh.profile.bundles 後重新啟動 dsh web。
+# ============================================================================
+
+- insert:
+    - id: dsh-locale-zh-tw
+      name: dsh-locale-zh-tw
