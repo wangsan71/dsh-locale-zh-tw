@@ -23,7 +23,7 @@ dsh plugin --profile web add dsh-locale-zh-tw
 ```jsonc
 {
   "dependencies": {
-    "dsh-locale-zh-tw": "^0.1.0"
+    "dsh-locale-zh-tw": "^0.1.1"
   },
   "dsh": {
     "profile": {
@@ -40,19 +40,20 @@ dsh plugin --profile web add dsh-locale-zh-tw
 
 ## 使用
 
-- 設定 → 一般 → **語言** → 選「繁體中文」，整頁立即變成繁體。
+- 設定 → 一般 → **語言** → 選「繁體中文」，整頁立即變成繁體，並用 localStorage 記住（下次開啟自動恢復）。
 - 瀏覽器語言是 `zh-TW` / `zh-Hant` / `zh-HK` / `zh-MO` 時，開啟後自動選繁體。
-- 選擇會用 localStorage 記住（主機端 settings schema 只認 `zh`/`en`，所以偏好存在瀏覽器端；這是刻意為之，避免改動核心）。
+- 偏好存在瀏覽器端而非主機端：主機 settings schema 只認 `zh`/`en`，zh-TW 寫主機從一開始就不被支援，這是刻意繞行、不改動核心的結果（代價：換瀏覽器需重選一次）。
 
 ## 原理（簡短版）
 
 核心 `@deepseek-ai/dsh-client-locale` 只內建 `zh`/`en`，語系清單是固定常數、沒有對外註冊新語系的 API。本套件完全不修改核心檔案，改在瀏覽端對 `LocaleRuntime` 實例做**防呆擴充**：
 
-1. 把 `zh-TW` 加入語系快照（語言列可選）。
-2. 查詢鏈在 zh-TW 下變成「明確 zh-TW → zh 簡轉繁 → en」——任何命名空間只要有小字典就有繁體，不會掉回英文。
-3. 偏好改用 localStorage 持久化。
-4. 繁中地區瀏覽器自動選繁體。
-5. `<html lang>` 在 zh-TW 時設為 `zh-Hant-TW`。
+1. **publish 守衛**：`LocaleRuntime.publish` 是核心快照變更為數唯一的出口（`setLocale` / `adopt` / `register` 全走這裡）。核心把主機設定視為語言偏好的事實來源：zh-TW 寫入主機會被 schema 拒絕 → 客戶端「恢復重載」設定 → 核心 `adopt()` 隨即 `publish` 回 `zh`/`en`，介面剛切繁就立刻被翻回簡。守衛攔截在這個出口：只要瀏覽器端偏好是 zh-TW，任何回退別的語言的 publish 都在快照落地前被改寫回 zh-TW。
+2. 把 `zh-TW` 加入語系快照（語言列可選）。
+3. 查詢鏈在 zh-TW 下變成「明確 zh-TW → zh 簡轉繁 → en」——任何命名空間只要有小字典就有繁體，不會掉回英文。
+4. `setLocale` 重排：先把偏好寫進 localStorage 再 publish（守衛讀到新值才擋得住回退）；zh-TW **完全不寫主機**（寫了必被拒、還觸發回退鏈），zh/en 照常走核心持久化。
+5. 繁中地區瀏覽器自動選繁體。
+6. `<html lang>` 在 zh-TW 時設為 `zh-Hant-TW`。
 
 所有步驟都包在 try/catch：**任何失敗都只會靜默降級，不會影響 dsh web 載入**。若未來核心內建 zh-TW，補丁會自動偵測並跳過。
 
@@ -61,6 +62,13 @@ dsh plugin --profile web add dsh-locale-zh-tw
 - 適用於 `@deepseek-ai/dsh-client-locale@0.1.1-rc.2` 系列的 LocaleRuntime 結構。
 - 瀏覽端 bundle 零外部依賴（不 require 任何套件），主機端零依賴，安裝到任何 profile 都不會缺套件。
 - 簡轉繁採用台灣用語（設定/儲存/搜尋/載入/訊息/外掛程式/資料夾/檔案/快取/金鑰/逾時/唯讀…），共 89 組片語 + 389 字元對照。
+
+## 更新记录
+
+- **0.1.1**
+  - 修復「選了繁體中文卻立刻被翻回簡體 / 重新整理後記憶失效」：新增 `publish` 守衛 + `setLocale` 重排，zh-TW 不再觸發主機寫入與恢復回退鏈（詳見 `REPORT-zh-tw-cannot-switch.md`）。
+  - 修復 `package.json` 缺 `exports` 根入口導致 `ERR_PACKAGE_PATH_NOT_EXPORTED`、`dsh web` 啟動即崩（詳見 `REPORT-dsh-plugin-errors.md`）。
+- **0.1.0** 首版：zh-TW 語系註冊、即時簡轉繁、localStorage 偏好、繁中瀏覽器自動切換。
 
 ## 授權
 
